@@ -1,0 +1,36 @@
+builder
+      .addPath(
+        // Line 1
+        new BezierCurve(
+          new Point(9.000, 110.000, Point.CARTESIAN),
+          new Point(25.000, 120.000, Point.CARTESIAN),
+          new Point(18.000, 125.000, Point.CARTESIAN)
+        )
+      )
+      .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-45))
+      .addPath(
+        // Line 2
+        new BezierLine(
+          new Point(18.000, 125.000, Point.CARTESIAN),
+          new Point(15.000, 128.000, Point.CARTESIAN)
+        )
+      )
+      .setTangentHeadingInterpolation()
+      .setReversed(true)
+      .addPath(
+        // Line 3
+        new BezierLine(
+          new Point(15.000, 128.000, Point.CARTESIAN),
+          new Point(18.000, 125.000, Point.CARTESIAN)
+        )
+      )
+      .setTangentHeadingInterpolation()
+      .addPath(
+        // Line 4
+        new BezierLine(
+          new Point(18.000, 125.000, Point.CARTESIAN),
+          new Point(35.000, 120.000, Point.CARTESIAN)
+        ))
+      .setLinearHeadingInterpolation(Math.toRadians(-45), Math.toRadians(0));
+  }
+} 
