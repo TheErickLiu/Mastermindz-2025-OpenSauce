@@ -3,6 +3,18 @@ package pedroPathing.teleop;
 import android.widget.GridLayout;
 import java.util.concurrent.TimeUnit;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+import org.openftc.easyopencv.OpenCvPipeline;
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+
 public class IntakeOuttake {
     public static TelescopingArm arm;
     public static Claw claw;
@@ -11,6 +23,7 @@ public class IntakeOuttake {
     public Instructions instruction;
     public SpecificInstructions specificInstruction;
     public SpecificInstructions previousSpecificInstruction;
+    OpenCvCamera webcam;
     private long previous_action = System.currentTimeMillis();
     private double waitTime = 1000;
     public static boolean closed_zero_out = true;

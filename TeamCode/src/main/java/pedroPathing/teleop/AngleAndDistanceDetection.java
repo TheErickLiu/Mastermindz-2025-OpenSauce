@@ -57,7 +57,7 @@ public class AngleAndDistanceDetection extends OpMode {
         }
     }
 
-    static class AngleAndDistancePipeline extends OpenCvPipeline {
+    public static class AngleAndDistancePipeline extends OpenCvPipeline {
         Mat hsvMat = new Mat();
         Mat mask = new Mat();
         List<MatOfPoint> contours = new ArrayList<>();
@@ -96,9 +96,24 @@ public class AngleAndDistanceDetection extends OpMode {
             }
             return input;
         }
+        public boolean detectSampleInFront(Mat input) {
+            Imgproc.cvtColor(input, hsvMat, Imgproc.COLOR_RGB2HSV);
 
-    public double getDistanceToObject() {
-        return distanceToObject;
+            Scalar lowerBlue = new Scalar(110, 100, 100);
+            Scalar upperBlue = new Scalar(130, 255, 255);
+            Core.inRange(hsvMat, lowerBlue, upperBlue, mask);
+
+            int centerX = input.cols() / 2;
+
+            for (int y = 0; y < mask.rows(); y++) {
+                double[] pixel = mask.get(y, centerX);
+                if (pixel != null && pixel.length > 0 && pixel[0] > 200) {
+                    return true; // A blue pixel is detected in the center column
+                }
+            }
+
+            return false; // No blue pixel detected
+        }
+
     }
-}
 }
