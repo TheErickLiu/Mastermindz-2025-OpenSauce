@@ -1,0 +1,29 @@
+Control Hub:
+Motors:
+0: leftFront
+1: rightFront
+2: leftRear
+3: rightRear
+
+Servos:
+0:
+1: intakeRight
+2: intakeLeft
+3:
+4:
+5: claw
+
+Expansion Hub:
+Motors:
+0: pitch
+1: firststring
+2: secondstring
+3:
+
+Servos:
+0: pusher
+1:
+2:
+3:
+4:
+5:

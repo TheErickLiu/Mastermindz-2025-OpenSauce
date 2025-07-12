@@ -23,7 +23,6 @@ public class TeleOpMode extends LinearOpMode {
     Claw claw;
     Differential diffy;
     IntakeOuttake intakeOuttake;
-    Servo latch;
     public static int extension = 0;
 
     @Override
@@ -54,7 +53,6 @@ public class TeleOpMode extends LinearOpMode {
 
         pusher = new Pusher(hardwareMap);
 
-        latch = hardwareMap.get(Servo.class, "latch");
         intakeOuttake.arm.pitch_zeroed = true;
 
         Gamepad currentGamepad1 = new Gamepad();

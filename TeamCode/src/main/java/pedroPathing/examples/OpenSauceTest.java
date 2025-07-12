@@ -13,8 +13,8 @@ import com.pedropathing.util.Drawing;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import  com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.hardware.PwmControl;
-import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.openftc.easyopencv.OpenCvCamera;
@@ -23,12 +23,7 @@ import org.openftc.easyopencv.OpenCvCameraRotation;
 
 import pedroPathing.constants.FConstants;
 import pedroPathing.constants.LConstants;
-import pedroPathing.teleop.Claw;
-import pedroPathing.teleop.Differential;
-import pedroPathing.teleop.IntakeOuttake;
 import pedroPathing.teleop.Camera.AngleAndDistancePipeline;
-import pedroPathing.teleop.Pusher;
-import pedroPathing.teleop.TelescopingArm;
 
 /**
  * This is an example auto that showcases movement and control of two servos autonomously.
@@ -41,23 +36,18 @@ import pedroPathing.teleop.TelescopingArm;
  */
 
 @Config
-@Autonomous(name = "OpenSauceAuto", group = "Examples")
-public class OpenSauceAuto extends OpMode {
+@Autonomous(name = "OpenSauceTest", group = "Examples")
+public class OpenSauceTest extends OpMode {
     private PoseUpdater poseUpdater;
     private DashboardPoseTracker dashboardPoseTracker;
-    private IntakeOuttake intakeOuttake;
     private Follower follower;
     private Timer pathTimer, actionTimer, opmodeTimer;
-    private TelescopingArm arm;
-    private Differential diffy;
-    private Claw claw;
-    private Servo latch;
-    private Pusher pusher;
-    private PwmControl pwmControl;
     private AngleAndDistancePipeline webcam1Pipeline;
     private AngleAndDistancePipeline webcam2Pipeline;
     private OpenCvCamera webcam1;
     private OpenCvCamera webcam2;
+
+    private Pose stepPose; // current target during search stepping
 
     private double STEP_SIZE = 0.5;
 
@@ -77,10 +67,10 @@ public class OpenSauceAuto extends OpMode {
     private final Pose startPose = new Pose(-1, 0, Math.toRadians(0));
     private final Pose scorePose = new Pose(2, 17, Math.toRadians(-45));
 
-    private final Pose searchStartPose = new Pose (0, -6, Math.toRadians(-90));
-    private final Pose searchEndPose = new Pose (28, -6, Math.toRadians(-90));
-    private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
+    private final Pose searchStartPose = new Pose (-1, 3, Math.toRadians(-90));
+    private final Pose searchEndPose = new Pose (16.5, 3, Math.toRadians(-90));
     private final Pose searchToDeposit = new Pose (6, 10, Math.toRadians(-45));
+    private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
 
     /* These are our Paths and PathChains that we will define in buildPaths() */
     private Path scorePreload, deposit, scoreToSearch, searchPath, moveForward, searchToScore;
@@ -124,157 +114,92 @@ public class OpenSauceAuto extends OpMode {
     /** This switch is called continuously and runs the pathing, at certain points, it triggers the action state.
      * Everytime the switch changes case, it will reset the timer. (This is because of the setPathState() method)
      * The followPath() function sets the follower to run the specific path, but does NOT wait for it to finish before moving on. */
-    private Pose stepPose;
 
     private double distanceBetweenPoses(Pose a, Pose b) {
         double dx = a.getX() - b.getX();
         double dy = a.getY() - b.getY();
         return Math.hypot(dx, dy);
     }
+
     public void autonomousPathUpdate() {
         switch (pathState) {
-            /* Cases 0 to 5 are for depositing the initial sample before entering the search loop */
             case 0:
-                intakeOuttake.closed_zero_out = false;
-                intakeOuttake.arm.override_pitch = true;
-                pwmControl.setPwmDisable();
-                intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
-                intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
                 follower.followPath(scorePreload, true);
                 setPathState(1);
                 break;
+
             case 1:
-                /* This case checks the robot's position and will wait until the robot position is close (1 inch away) from the scorePose's position */
-                if(pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), scorePose) < 2.0) {
                     follower.followPath(deposit, true);
                     setPathState(2);
                 }
                 break;
+
             case 2:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
-                    diffy.resetOffsets();
-                    arm.resetOffsets();
-                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.DEPOSIT);
-                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.PITCH_DEPOSIT);
+                    follower.followPath(scoreToSearch, true);
                     setPathState(3);
                 }
                 break;
+
             case 3:
-                /* This case checks the robot's position and will wait until the robot position is close (1 inch away) from the scorePose's position */
-                if(pathTimer.getElapsedTimeSeconds() > 1 &&
-                        intakeOuttake.arm.extensionLeft.getCurrentPosition() < -1500 &&
-                        distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
-                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.OPEN_CLAW);
-                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.OPEN_CLAW);
-                    setPathState(4);
-                }
-                break;
-            case 4:
-                setPathState(5);
-                break;
-            case 5:
-                if(pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
-                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.DOWN_HOLD);
-                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
-                    setPathState(6);
-                }
-                break;
-            case 6:
-                follower.followPath(scoreToSearch, true);
-                setPathState(7);
-                break;
-            case 7:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), searchStartPose) < 1.0) {
-                    setPathState(8);
+                    setPathState(5);
                 }
                 break;
-            case 8:
-                if (pathTimer.getElapsedTimeSeconds() > 0.3) {
+
+            case 4:
+                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                        distanceBetweenPoses(follower.getPose(), stepPose) < 1.0) {
+                    if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
+
+                        follower.followPath(new Path(new BezierLine(
+                                new Point(follower.getPose()),
+                                new Point(searchToDeposit)
+                        )), true);
+                        setPathState(8);
+                    } else {
+                        setPathState(5);
+                    }
+                }
+                break;
+
+            case 5:
+                if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                     Pose currentPose = follower.getPose();
-                    Pose stepPose = new Pose(currentPose.getX() + STEP_SIZE, -6, -90);
+                    stepPose = new Pose(currentPose.getX() + STEP_SIZE, searchStartPose.getY(), searchStartPose.getHeading());
 
                     moveForward = new Path(new BezierLine(new Point(currentPose), new Point(stepPose)));
                     moveForward.setLinearHeadingInterpolation(currentPose.getHeading(), stepPose.getHeading());
 
-                    follower.followPath(moveForward,true);
-                    setPathState(9);
+                    follower.followPath(moveForward, true);
+                    setPathState(4);
                 }
-                break;
-            case 9:
-                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), stepPose) < 1.0) {
-                    //boolean sampleDetected = webcam1Pipeline.detectSampleInFront(currentFrameWebcam1);
-                    boolean sampleDetected = true;
-                    if (sampleDetected) {
-                        setPathState(10);
-                    } else if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
-                        setPathState(99); // Search complete
-                    } else {
-                        setPathState(8);
-                    }
-                }
-                break;
-            case 10:
-                // move diffy to directly down
-                // move pitch to 30 degrees
-                // extend arm to x amount
-                // calculate and move diffy so its still directly pointed down
-                // calculate height of camera above ground
-                setPathState(11);
-                break;
-            case 11:
-                // check if sample contour center is in center of camera
-                // If true, set state 12
-                // If false,
-                // extend arm by x amount
-                // Lower pitch by (original pitch - sin^-1(height/arm length))
-                // repeat state 11
-                setPathState(12);
-                break;
-            case 12:
-                // claw fully opened
-                // calculate distance from base of arm
-                // calculate distance need to extend
-                // run get angle on sample
-                // calculate diffy offset
-                setPathState(13);
-                break;
-            case 13:
-                // pitch to 0
-                // rotate diffy to calculated offset
-                // extend to 0
-                // extend to calculated distance
-                // close claw
-                setPathState(14);
-                break;
-            case 14:
-                follower.followPath(new Path(new BezierLine(
-                        new Point(follower.getPose()),
-                        new Point(searchToDeposit)
-                )), true);
-                setPathState(15);
                 break;
 
-            case 15:
+            case 8:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), searchToDeposit) < 0.5) {
                     follower.followPath(searchToScore, true);
-                    setPathState(16);
+                    setPathState(9);
                 }
                 break;
 
-            case 16:
+            case 9:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 0.5) {
-                    setPathState(1);
+                    setPathState(10);
                 }
+                break;
+
+            case 10:
                 break;
         }
     }
+
     /** These change the states of the paths and actions
      * It will also reset the timers of the individual switches **/
     public void setPathState(int pState) {
@@ -287,19 +212,50 @@ public class OpenSauceAuto extends OpMode {
     public void loop() {
         poseUpdater.update();
         dashboardPoseTracker.update();
-
-        // These loop the movements of the robot
         follower.update();
-        intakeOuttake.update();
         autonomousPathUpdate();
 
-        // Feedback to Driver Hub
+        // Current robot pose
+        Pose currentPose = follower.getPose();
+
+        // Determine current target pose based on pathState
+        Pose targetPose = null;
+        switch (pathState) {
+            case 0:
+                targetPose = scorePose;
+                break;
+            case 1:
+                targetPose = depositPose;
+                break;
+            case 2:
+                targetPose = searchStartPose;
+                break;
+            case 4:
+            case 5:
+            case 6:
+                targetPose = stepPose;
+                break;
+            case 8:
+            case 9:
+                targetPose = scorePose;
+                break;
+        }
+
+        // Log current pose
+        telemetry.addData("Current Pose X: ", String.valueOf(currentPose.getX()));
+        telemetry.addData("Current Pose Y: ", String.valueOf(currentPose.getY()));
+        telemetry.addData("Current Pose Angle: ", Math.toDegrees(currentPose.getHeading()));
+
+        // Log target pose
+        if (targetPose != null) {
+            telemetry.addData("Target Pose X: ", String.valueOf(targetPose.getX()));
+            telemetry.addData("Target Pose Y: ", String.valueOf(targetPose.getY()));
+            telemetry.addData("Target Pose Angle: ", Math.toDegrees(targetPose.getHeading()));
+        } else {
+            telemetry.addData("Target Pose", "None (waiting)");
+        }
+
         telemetry.addData("path state", pathState);
-        telemetry.addData("x", follower.getPose().getX());
-        telemetry.addData("y", follower.getPose().getY());
-        telemetry.addData("heading", follower.getPose().getHeading());
-        telemetry.addData("pitch", intakeOuttake.arm.pitch.getCurrentPosition());
-        telemetry.addData("arm", intakeOuttake.arm.extensionLeft.getCurrentPosition());
         telemetry.update();
 
         Drawing.drawPoseHistory(dashboardPoseTracker, "#4CAF50");
@@ -307,14 +263,10 @@ public class OpenSauceAuto extends OpMode {
         Drawing.sendPacket();
     }
 
+
     /** This method is called once at the init of the OpMode. **/
     @Override
     public void init() {
-        arm = new TelescopingArm(hardwareMap);
-        claw = new Claw(hardwareMap);
-        diffy = new Differential(hardwareMap);
-        pusher = new Pusher(hardwareMap);
-        intakeOuttake = new IntakeOuttake(arm, claw, diffy, pusher);
 
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
                 "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
@@ -356,11 +308,12 @@ public class OpenSauceAuto extends OpMode {
         });
         telemetry.addData("Status", "Initialized");
 
+        telemetry.addData("Status", "Initialized");
+
         poseUpdater = new PoseUpdater(hardwareMap);
         dashboardPoseTracker = new DashboardPoseTracker(poseUpdater);
 
         poseUpdater.setStartingPose(new Pose(startPose.getX(), startPose.getY(), startPose.getHeading()));
-
         poseUpdater.update();
         dashboardPoseTracker.update();
 
@@ -370,22 +323,6 @@ public class OpenSauceAuto extends OpMode {
 
         Drawing.drawRobot(poseUpdater.getPose(), "#4CAF50");
         Drawing.sendPacket();
-
-        intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLOSED);
-        intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
-        double startTime = System.currentTimeMillis();
-
-        intakeOuttake.arm.pitch_zeroed = true;
-        latch = hardwareMap.get(Servo.class, "latch");
-
-        if (latch instanceof PwmControl) {
-            pwmControl = (PwmControl) latch;
-        }
-
-        while (System.currentTimeMillis() - startTime <= 5000) { }
-
-        latch.getController().pwmEnable();
-        latch.setPosition(0);
 
         Constants.setConstants(FConstants.class, LConstants.class);
         follower = new Follower(hardwareMap);
@@ -397,7 +334,7 @@ public class OpenSauceAuto extends OpMode {
     /** This method is called continuously after Init while waiting for "play". **/
     @Override
     public void init_loop() {
-        intakeOuttake.update();
+       // intakeOuttake.update();
     }
 
     /** This method is called once at the start of the OpMode.
@@ -405,20 +342,11 @@ public class OpenSauceAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-
-        latch.setPosition(1);
-
-        intakeOuttake.closed_zero_out = false;
-        intakeOuttake.arm.override_pitch = true;
-        intakeOuttake.arm.resetOffsets();
-
         setPathState(0);
     }
 
     /** We do not use this because everything should automatically disable **/
     @Override
     public void stop() {
-        if (webcam1 != null) webcam1.stopStreaming();
-        if (webcam2 != null) webcam2.stopStreaming();
     }
 }
