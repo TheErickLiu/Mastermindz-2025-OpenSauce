@@ -17,9 +17,12 @@ import com.qualcomm.robotcore.hardware.PwmControl;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.opencv.core.MatOfPoint;
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
+
+import java.util.List;
 
 import pedroPathing.constants.FConstants;
 import pedroPathing.constants.LConstants;
@@ -76,11 +79,10 @@ public class OpenSauceAuto extends OpMode {
 
     private final Pose startPose = new Pose(-1, 0, Math.toRadians(0));
     private final Pose scorePose = new Pose(2, 17, Math.toRadians(-45));
-
-    private final Pose searchStartPose = new Pose (0, -6, Math.toRadians(-90));
-    private final Pose searchEndPose = new Pose (28, -6, Math.toRadians(-90));
+    private final Pose searchStartPose = new Pose (-1, 3, Math.toRadians(-90));
+    private final Pose searchEndPose = new Pose (16.5, 3, Math.toRadians(-90));
+    private final Pose searchToDeposit = new Pose (8, 10, Math.toRadians(-45));
     private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
-    private final Pose searchToDeposit = new Pose (6, 10, Math.toRadians(-45));
 
     /* These are our Paths and PathChains that we will define in buildPaths() */
     private Path scorePreload, deposit, scoreToSearch, searchPath, moveForward, searchToScore;
@@ -163,7 +165,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
             case 3:
                 /* This case checks the robot's position and will wait until the robot position is close (1 inch away) from the scorePose's position */
-                if(pathTimer.getElapsedTimeSeconds() > 1 &&
+                if(pathTimer.getElapsedTimeSeconds() > 2 &&
                         intakeOuttake.arm.extensionLeft.getCurrentPosition() < -1500 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.OPEN_CLAW);
@@ -175,7 +177,7 @@ public class OpenSauceAuto extends OpMode {
                 setPathState(5);
                 break;
             case 5:
-                if(pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                if(pathTimer.getElapsedTimeSeconds() > 1 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.DOWN_HOLD);
                     intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
@@ -183,8 +185,11 @@ public class OpenSauceAuto extends OpMode {
                 }
                 break;
             case 6:
-                follower.followPath(scoreToSearch, true);
-                setPathState(7);
+                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                        distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
+                    follower.followPath(scoreToSearch, true);
+                    setPathState(7);
+                }
                 break;
             case 7:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
@@ -193,9 +198,9 @@ public class OpenSauceAuto extends OpMode {
                 }
                 break;
             case 8:
-                if (pathTimer.getElapsedTimeSeconds() > 0.3) {
+                if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                     Pose currentPose = follower.getPose();
-                    Pose stepPose = new Pose(currentPose.getX() + STEP_SIZE, -6, -90);
+                    stepPose = new Pose(currentPose.getX() + STEP_SIZE, searchStartPose.getY(), searchStartPose.getHeading());
 
                     moveForward = new Path(new BezierLine(new Point(currentPose), new Point(stepPose)));
                     moveForward.setLinearHeadingInterpolation(currentPose.getHeading(), stepPose.getHeading());
@@ -207,8 +212,8 @@ public class OpenSauceAuto extends OpMode {
             case 9:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), stepPose) < 1.0) {
-                    //boolean sampleDetected = webcam1Pipeline.detectSampleInFront(currentFrameWebcam1);
-                    boolean sampleDetected = true;
+
+                    boolean sampleDetected = webcam1Pipeline.detectSampleInFront(webcam1Pipeline.getLatestFrame());
                     if (sampleDetected) {
                         setPathState(10);
                     } else if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
@@ -249,7 +254,7 @@ public class OpenSauceAuto extends OpMode {
                 // extend to 0
                 // extend to calculated distance
                 // close claw
-                setPathState(14);
+                setPathState(99);
                 break;
             case 14:
                 follower.followPath(new Path(new BezierLine(
@@ -273,6 +278,8 @@ public class OpenSauceAuto extends OpMode {
                     setPathState(1);
                 }
                 break;
+            case 99:
+                break;
         }
     }
     /** These change the states of the paths and actions
@@ -292,6 +299,29 @@ public class OpenSauceAuto extends OpMode {
         follower.update();
         intakeOuttake.update();
         autonomousPathUpdate();
+
+        // Webcam 1 detection and contour info
+        if (webcam1Pipeline != null) {
+            boolean detected1 = webcam1Pipeline.detectSampleInFront(webcam1Pipeline.getLatestFrame());
+            List<MatOfPoint> contours1 = webcam1Pipeline.getValidContours(webcam1Pipeline.getLatestFrame());
+
+            telemetry.addData("Cam1 Detected", detected1);
+            telemetry.addData("Cam1 Contour Count", contours1.size());
+            for (int i = 0; i < contours1.size(); i++) {
+                telemetry.addData("Cam1 Contour " + i + " Area", contours1.get(i));
+            }
+        }
+
+        // Webcam 2 angle from closest yellow object
+        if (webcam2Pipeline != null) {
+            int[] angleData = AngleAndDistancePipeline.getClosestYellowContourAngle(webcam2Pipeline.getLatestFrame());
+            if (angleData != null) {
+                telemetry.addData("Cam2 Yellow Angle", angleData[2]);
+                telemetry.addData("Cam2 Yellow Center", "(" + angleData[0] + ", " + angleData[1] + ")");
+            } else {
+                telemetry.addData("Cam2 Yellow", "None detected");
+            }
+        }
 
         // Feedback to Driver Hub
         telemetry.addData("path state", pathState);
@@ -316,13 +346,10 @@ public class OpenSauceAuto extends OpMode {
         pusher = new Pusher(hardwareMap);
         intakeOuttake = new IntakeOuttake(arm, claw, diffy, pusher);
 
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-
         // Webcam 1 setup
         webcam1Pipeline = new AngleAndDistancePipeline("Webcam 1");
         webcam1 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 1"));
         webcam1.setPipeline(webcam1Pipeline);
         webcam1.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -340,7 +367,7 @@ public class OpenSauceAuto extends OpMode {
         // Webcam 2 setup
         webcam2Pipeline = new AngleAndDistancePipeline("Webcam 2");
         webcam2 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 2"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 2"));
         webcam2.setPipeline(webcam2Pipeline);
         webcam2.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -354,7 +381,6 @@ public class OpenSauceAuto extends OpMode {
                 telemetry.update();
             }
         });
-        telemetry.addData("Status", "Initialized");
 
         poseUpdater = new PoseUpdater(hardwareMap);
         dashboardPoseTracker = new DashboardPoseTracker(poseUpdater);
@@ -392,6 +418,8 @@ public class OpenSauceAuto extends OpMode {
         follower.setStartingPose(startPose);
         follower.startTeleopDrive();
         buildPaths();
+
+        telemetry.addData("Status", "Initialized");
     }
 
     /** This method is called continuously after Init while waiting for "play". **/

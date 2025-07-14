@@ -17,9 +17,12 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.opencv.core.MatOfPoint;
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
+
+import java.util.List;
 
 import pedroPathing.constants.FConstants;
 import pedroPathing.constants.LConstants;
@@ -69,7 +72,7 @@ public class OpenSauceTest extends OpMode {
 
     private final Pose searchStartPose = new Pose (-1, 3, Math.toRadians(-90));
     private final Pose searchEndPose = new Pose (16.5, 3, Math.toRadians(-90));
-    private final Pose searchToDeposit = new Pose (6, 10, Math.toRadians(-45));
+    private final Pose searchToDeposit = new Pose (8, 10, Math.toRadians(-45));
     private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
 
     /* These are our Paths and PathChains that we will define in buildPaths() */
@@ -154,8 +157,13 @@ public class OpenSauceTest extends OpMode {
             case 4:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), stepPose) < 1.0) {
-                    if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
 
+                    boolean sampleCam1 = webcam1Pipeline.detectSampleInFront(webcam1Pipeline.getLatestFrame());
+
+                    if (sampleCam1) {
+                        setPathState(10);
+
+                    } else if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
                         follower.followPath(new Path(new BezierLine(
                                 new Point(follower.getPose()),
                                 new Point(searchToDeposit)
@@ -215,6 +223,29 @@ public class OpenSauceTest extends OpMode {
         follower.update();
         autonomousPathUpdate();
 
+        // Debugging: Webcam 1 detection and contour info
+        if (webcam1Pipeline != null) {
+            boolean detected1 = webcam1Pipeline.detectSampleInFront(webcam1Pipeline.getLatestFrame());
+            List<MatOfPoint> contours1 = webcam1Pipeline.getValidContours(webcam1Pipeline.getLatestFrame());
+
+            telemetry.addData("Cam1 Detected", detected1);
+            telemetry.addData("Cam1 Contour Count", contours1.size());
+            for (int i = 0; i < contours1.size(); i++) {
+                telemetry.addData("Cam1 Contour " + i + " Area", contours1.get(i));
+            }
+        }
+
+        // Webcam 2 angle from closest yellow object
+        if (webcam2Pipeline != null) {
+            int[] angleData = AngleAndDistancePipeline.getClosestYellowContourAngle(webcam2Pipeline.getLatestFrame());
+            if (angleData != null) {
+                telemetry.addData("Cam2 Yellow Angle", angleData[2]);
+                telemetry.addData("Cam2 Yellow Center", "(" + angleData[0] + ", " + angleData[1] + ")");
+            } else {
+                telemetry.addData("Cam2 Yellow", "None detected");
+            }
+        }
+
         // Current robot pose
         Pose currentPose = follower.getPose();
 
@@ -268,13 +299,10 @@ public class OpenSauceTest extends OpMode {
     @Override
     public void init() {
 
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-
         // Webcam 1 setup
         webcam1Pipeline = new AngleAndDistancePipeline("Webcam 1");
         webcam1 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 1"));
         webcam1.setPipeline(webcam1Pipeline);
         webcam1.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -292,7 +320,7 @@ public class OpenSauceTest extends OpMode {
         // Webcam 2 setup
         webcam2Pipeline = new AngleAndDistancePipeline("Webcam 2");
         webcam2 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 2"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 2"));
         webcam2.setPipeline(webcam2Pipeline);
         webcam2.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -306,9 +334,6 @@ public class OpenSauceTest extends OpMode {
                 telemetry.update();
             }
         });
-        telemetry.addData("Status", "Initialized");
-
-        telemetry.addData("Status", "Initialized");
 
         poseUpdater = new PoseUpdater(hardwareMap);
         dashboardPoseTracker = new DashboardPoseTracker(poseUpdater);
@@ -329,6 +354,8 @@ public class OpenSauceTest extends OpMode {
         follower.setStartingPose(startPose);
         follower.startTeleopDrive();
         buildPaths();
+
+        telemetry.addData("Status", "Initialized");
     }
 
     /** This method is called continuously after Init while waiting for "play". **/

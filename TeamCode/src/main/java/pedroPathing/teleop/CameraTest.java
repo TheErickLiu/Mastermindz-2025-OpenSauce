@@ -4,9 +4,13 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
+
+import java.util.List;
 
 @TeleOp(name = "Camera Test", group = "Test")
 public class CameraTest extends OpMode {
@@ -15,23 +19,20 @@ public class CameraTest extends OpMode {
 
     Camera.AngleAndDistancePipeline pipeline1;
     Camera.AngleAndDistancePipeline pipeline2;
-
     boolean webcam1Ready = false;
     boolean webcam2Ready = false;
 
     @Override
     public void init() {
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
         // Webcam 1 setup
         webcam1 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 1"));
         pipeline1 = new Camera.AngleAndDistancePipeline("Webcam 1");
         webcam1.setPipeline(pipeline1);
         webcam1.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
             public void onOpened() {
-                webcam1.startStreaming(320, 240, OpenCvCameraRotation.UPRIGHT);
+                webcam1.startStreaming(320, 240, OpenCvCameraRotation.UPSIDE_DOWN);
                 webcam1Ready = true;
             }
 
@@ -43,7 +44,7 @@ public class CameraTest extends OpMode {
 
         // Webcam 2 setup
         webcam2 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 2"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 2"));
         pipeline2 = new Camera.AngleAndDistancePipeline("Webcam 2");
         webcam2.setPipeline(pipeline2);
         webcam2.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
@@ -58,6 +59,9 @@ public class CameraTest extends OpMode {
                 telemetry.addData("Webcam 2 error", errorCode);
             }
         });
+
+
+        telemetry.addData("Status", "Initialized");
     }
 
     @Override
@@ -65,16 +69,23 @@ public class CameraTest extends OpMode {
         telemetry.addData("Status", "Running");
 
         if (webcam1Ready) {
-            boolean detected = pipeline1.detectSampleInFront(pipeline1.getLatestFrame());
+            Mat currentFrame1 = pipeline1.getLatestFrame();
+
+            boolean detected = pipeline1.detectSampleInFront(currentFrame1);
+            List<MatOfPoint> debugContours = pipeline1.getValidContours(currentFrame1);
+
+            telemetry.addData("Valid Contours", debugContours);
             telemetry.addData("Sample in front (Cam 1):", detected);
         } else {
             telemetry.addData("Webcam 1", "Not ready yet");
         }
 
         if (webcam2Ready) {
-            int[] angleData = Camera.AngleAndDistancePipeline.getClosestYellowContourAngle(pipeline2.getLatestFrame());
+            Mat currentFrame2 = pipeline2.getLatestFrame();
+
+            int[] angleData = Camera.AngleAndDistancePipeline.getClosestYellowContourAngle(currentFrame2);
             if (angleData != null) {
-                telemetry.addData("Closest Yellow (Cam 2):", String.valueOf(angleData[0]), String.valueOf(angleData[1]), String.valueOf(angleData[2]));
+                telemetry.addData("Angle of Closest Yellow (Cam 2):", String.valueOf(angleData[2]));
             } else {
                 telemetry.addData("Closest Yellow (Cam 2):", "None detected");
             }

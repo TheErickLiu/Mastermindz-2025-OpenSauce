@@ -13,6 +13,8 @@ Servos:
 4:
 5: claw
 
+I2C Bus 1: pinpoint
+
 Expansion Hub:
 Motors:
 0: pitch

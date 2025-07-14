@@ -26,12 +26,10 @@ public class Camera extends OpMode {
 
     @Override
     public void init() {
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
 
         // First Webcam
         webcam1 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 1"));
         webcam1.setPipeline(new AngleAndDistancePipeline("Webcam 1"));
         webcam1.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -47,7 +45,7 @@ public class Camera extends OpMode {
 
         // Second Webcam
         webcam2 = OpenCvCameraFactory.getInstance().createWebcam(
-                hardwareMap.get(WebcamName.class, "Webcam 2"), cameraMonitorViewId);
+                hardwareMap.get(WebcamName.class, "Webcam 2"));
         webcam2.setPipeline(new AngleAndDistancePipeline("Webcam 2"));
         webcam2.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -79,9 +77,9 @@ public class Camera extends OpMode {
     public static class AngleAndDistancePipeline extends OpenCvPipeline {
         private final Mat hsvMat = new Mat();
         private final Mat mask = new Mat();
-        private static final Scalar lowerYellow = new Scalar(10, 100, 100);
-        private static final Scalar upperYellow = new Scalar(30, 255, 255);
-        private static final double MIN_CONTOUR_AREA = 40000;
+        private static Scalar lowerYellow = new Scalar(10, 100, 100);
+        private static Scalar upperYellow = new Scalar(30, 255, 255);
+        private static final double MIN_CONTOUR_AREA = 1000;
         private final String cameraId;
         private Mat latestFrame = new Mat();
 
@@ -95,34 +93,74 @@ public class Camera extends OpMode {
             return input;
         }
 
-        /** Call this to check if a sample is currently detected in front */
-        public boolean detectSampleInFront(Mat input) {
+        public List<MatOfPoint> getValidContours(Mat input) {
+            lowerYellow = new Scalar(0, 100, 100);
+            upperYellow = new Scalar(40, 255, 255);
             Imgproc.cvtColor(input, hsvMat, Imgproc.COLOR_RGB2HSV);
             Core.inRange(hsvMat, lowerYellow, upperYellow, mask);
 
             List<MatOfPoint> contours = new ArrayList<>();
-            Mat hierarchy = new Mat();
-            Imgproc.findContours(mask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+            Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+
+            List<MatOfPoint> validContours = new ArrayList<>();
+            for (MatOfPoint contour : contours) {
+                if (Imgproc.contourArea(contour) >= MIN_CONTOUR_AREA) {
+                    validContours.add(contour);
+                }
+            }
+
+            return validContours;
+        }
+
+        /** Call this to check if a sample is currently detected in front */
+        public boolean detectSampleInFront(Mat input) {
+
+            List<MatOfPoint> validContours = getValidContours(input);
 
             int centerX = input.cols() / 2;
-            int tolerance = 15;  // +/- 15 pixels tolerance from center of screen
+            final double MIN_SCALE_AREA = 120000;
+            final double MAX_SCALE_AREA = 750000;
+            final int MIN_TOLERANCE = 80;
+            final int MAX_TOLERANCE = 500;
 
-            for (MatOfPoint contour : contours) {
+            // Find largest area among valid contours
+            double maxContourArea = 0;
+            for (MatOfPoint contour : validContours) {
                 double area = Imgproc.contourArea(contour);
+                if (area > maxContourArea) {
+                    maxContourArea = area;
+                }
+            }
 
-                if (area >= MIN_CONTOUR_AREA) {
-                    Moments M = Imgproc.moments(contour);
-                    if (M.get_m00() > 0) {
-                        int contourCenterX = (int) (M.get_m10() / M.get_m00());
-                        if (Math.abs(contourCenterX - centerX) <= tolerance) {
-                            return true;
-                        }
-                    }
+            if (maxContourArea == 0) return false;
+
+            // Scale and clamp tolerance
+            double clampedArea = Math.max(MIN_SCALE_AREA, Math.min(MAX_SCALE_AREA, maxContourArea));
+            int tolerance = (int) (MIN_TOLERANCE +
+                    (clampedArea - MIN_SCALE_AREA) * (MAX_TOLERANCE - MIN_TOLERANCE) / (MAX_SCALE_AREA - MIN_SCALE_AREA));
+
+            int bandLeft = centerX - tolerance;
+            int bandRight = centerX + tolerance;
+            int bandWidth = bandRight - bandLeft;
+
+            // Check bounding box overlap
+            for (MatOfPoint contour : validContours) {
+                Rect boundingBox = Imgproc.boundingRect(contour);
+                int left = boundingBox.x;
+                int right = boundingBox.x + boundingBox.width;
+
+                int overlapLeft = Math.max(left, bandLeft);
+                int overlapRight = Math.min(right, bandRight);
+                int overlapWidth = Math.max(0, overlapRight - overlapLeft);
+
+                if (overlapWidth >= 0.6 * bandWidth) {
+                    return true;
                 }
             }
 
             return false;
         }
+
         public static int[] getClosestYellowContourAngle(Mat input) {
             Mat hsv = new Mat();
             Mat mask = new Mat();
@@ -167,7 +205,6 @@ public class Camera extends OpMode {
             // Return as int array: [centerX, centerY, angle]
             return new int[] { (int) box.center.x, (int) box.center.y, angle};
         }
-
         public Mat getLatestFrame() {
             return latestFrame;
         }

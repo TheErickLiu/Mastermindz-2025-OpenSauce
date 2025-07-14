@@ -1,19 +1,6 @@
 package pedroPathing.teleop;
 
-import android.widget.GridLayout;
-import java.util.concurrent.TimeUnit;
-
-import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.openftc.easyopencv.OpenCvCamera;
-import org.openftc.easyopencv.OpenCvCameraFactory;
-import org.openftc.easyopencv.OpenCvCameraRotation;
-import org.openftc.easyopencv.OpenCvPipeline;
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.Rect;
-import org.opencv.core.Scalar;
-import org.opencv.imgproc.Imgproc;
 
 public class IntakeOuttake {
     public static TelescopingArm arm;
@@ -25,6 +12,11 @@ public class IntakeOuttake {
     public SpecificInstructions previousSpecificInstruction;
     OpenCvCamera webcam;
     private long previous_action = System.currentTimeMillis();
+    public double targetPitch = 0;
+    public double targetExtension = 0;
+    public double left = 0.98;
+    public double right = 0.06;
+
     private double waitTime = 1000;
     public static boolean closed_zero_out = true;
 
@@ -37,6 +29,16 @@ public class IntakeOuttake {
         instruction = Instructions.CLOSED;
         specificInstruction = SpecificInstructions.CLOSED;
         closed_zero_out = true;
+    }
+
+    public void setAutoSearchTarget(double pitch, double extension) {
+        this.targetPitch = pitch;
+        this.targetExtension = extension;
+    }
+
+    public void setAutoOrientTarget(double leftdiff, double rightdiff) {
+        this.left = leftdiff;
+        this.right = rightdiff;
     }
 
     public void reset(SpecificInstructions next) {
@@ -293,6 +295,11 @@ public class IntakeOuttake {
                             arm.retractFully();
                             arm.pitchToIntake();
                         }
+                        break;
+                    case MOVE_TO_AUTO_SEARCH_POS:
+                        arm.pitchTo(targetPitch);
+                        arm.extendTo(targetExtension);
+                        diffy.setPosition(left, right);
                         break;
                 }
                 break;
@@ -581,6 +588,7 @@ public class IntakeOuttake {
         SPECIMAN_EXTEND(1000),
         INTAKE_EXTENSION(1000),
         INTAKE_DIFFY(1000),
+        MOVE_TO_AUTO_SEARCH_POS(1000),
         UP(1000), DOWN(1000), LEFT(1000), RIGHT(1000), DEPO_DIFFY(1000), PUSHER_OPEN(1000);
 
 

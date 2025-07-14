@@ -12,7 +12,7 @@ public class DiffyTest extends OpMode {
     private Gamepad previousGamepad1 = new Gamepad();
     private Gamepad currentGamepad1 = new Gamepad();
 
-    private static final double STEP = 0.01;
+    private static final double STEP = 0.1;
 
     @Override
     public void init() {
@@ -47,10 +47,9 @@ public class DiffyTest extends OpMode {
             Differential.right_position += STEP;
         }
 
-        // Decrease servo positions
         if (currentGamepad1.dpad_right && !previousGamepad1.dpad_right) {
-            Differential.left_position -= STEP;
-            Differential.right_position += STEP;
+            Differential.left_position += STEP;
+            Differential.right_position -= STEP;
         }
 
         // Clamp positions between 0 and 1
