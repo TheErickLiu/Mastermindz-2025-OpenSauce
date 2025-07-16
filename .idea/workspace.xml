@@ -9,21 +9,11 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d429def9-bcce-4a9a-b3c4-60a79230f511" name="Changes" comment="the thing searchs forward n keeps camera pointed at floor">
-      <change afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoDiffyTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.9/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.bin" afterDir="false" />
+    <list default="true" id="d429def9-bcce-4a9a-b3c4-60a79230f511" name="Changes" comment="it can pick up the thing autonomous now">
       <change beforePath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceAuto.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceAuto.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/Camera.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/Camera.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/IntakeOuttake.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/IntakeOuttake.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabManualTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabManualTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/DiffyTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/DiffyTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/TeleOpMode.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/TeleOpMode.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,7 +23,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=Default, isTemplate=false, identifier=serial=192.168.43.1:5555;connection=662ae447)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=/Users/erickliu/.android/avd/Medium_Phone.avd)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -98,6 +88,7 @@
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;com.google.services.firebase.aqiPopupShown&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;/Users/erickliu/Desktop/Mastermindz-2025-OpenSauce&quot;
@@ -228,7 +219,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752470597977</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="it can pick up the thing autonomous now">
+      <option name="closed" value="true" />
+      <created>1752639530241</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1752639530241</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -249,6 +248,7 @@
     <MESSAGE value="added states, sample check for camera" />
     <MESSAGE value="i dont even know what commit this is by now" />
     <MESSAGE value="the thing searchs forward n keeps camera pointed at floor" />
-    <option name="LAST_COMMIT_MESSAGE" value="the thing searchs forward n keeps camera pointed at floor" />
+    <MESSAGE value="it can pick up the thing autonomous now" />
+    <option name="LAST_COMMIT_MESSAGE" value="it can pick up the thing autonomous now" />
   </component>
 </project>

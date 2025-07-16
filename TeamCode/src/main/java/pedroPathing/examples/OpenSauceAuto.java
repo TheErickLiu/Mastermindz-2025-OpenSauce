@@ -17,15 +17,18 @@ import com.qualcomm.robotcore.hardware.PwmControl;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import pedroPathing.constants.FConstants;
 import pedroPathing.constants.LConstants;
+import pedroPathing.teleop.Camera;
 import pedroPathing.teleop.Claw;
 import pedroPathing.teleop.Differential;
 import pedroPathing.teleop.IntakeOuttake;
@@ -61,11 +64,19 @@ public class OpenSauceAuto extends OpMode {
     private AngleAndDistancePipeline webcam2Pipeline;
     private OpenCvCamera webcam1;
     private OpenCvCamera webcam2;
+    boolean webcam1Ready = false;
+    boolean webcam2Ready = false;
+    int[] angleData;
+    private double totalDistance = 0;
 
     private double STEP_SIZE = 0.5;
     public static final int EXTENSION_SOFT_OFFSET = 150;
     private static final double DIST_INCREMENT = 2.0;
-    private static final double STEP_INTERVAL = 3.0;
+    private static final double STEP_INTERVAL = 1.5;
+    private static final double INITIAL_WAIT = 2.0;
+    private static final double LEFT_DOWN = 0.84;
+    private static final double RIGHT_DOWN = 0.16;
+    public double angleOfBlock;
 
     /** This is the variable where we store the state of our auto.
      * It is used by the pathUpdate method. */
@@ -136,7 +147,6 @@ public class OpenSauceAuto extends OpMode {
         double dy = a.getY() - b.getY();
         return Math.hypot(dx, dy);
     }
-
     public double[] calcNextStep(double pitch, double extension, double dist) {
         double angle = 0.00457866 * Math.pow(pitch - 300, 1.34041);
         double extendDist = 0.0342105 * (-extension) + 48.62829;
@@ -148,14 +158,13 @@ public class OpenSauceAuto extends OpMode {
         double newExtension = -(29.1981 * newExtendDist - 1419.40691);
         return new double[]{ newPitch, newExtension };
     }
-
     public double[] calcDiffyOrientLevel() {
 
         double leftcurrentpos = Differential.left.getPosition();
         double rightcurrentpos = Differential.right.getPosition();
 
         if (leftcurrentpos == 1 && rightcurrentpos == 0) {
-            return new double[]{ 1, 0 };
+            return new double[]{ 0.98, 0.02 };
         }
 
         double left = leftcurrentpos - 0.002 * DIST_INCREMENT;
@@ -166,6 +175,27 @@ public class OpenSauceAuto extends OpMode {
         right = Math.max(0.0, Math.min(1.0, right));
         return new double[]{ left, right };
     }
+    public double calcDiffyOrientToSample(double angle) {
+        if (angle < -90) {
+            angle += 180;
+        } else if (angle > 90) {
+            angle -= 180;
+        }
+
+        double difference = 0;
+        double delta = angle * (0.14 / 90.0);
+
+        if ((Differential.left_position + delta) > 1) {
+            difference = Math.abs(1 - (Differential.left_position + delta));
+            return (delta - difference);
+        }
+        else if ((Differential.right_position + delta) < 0) {
+            difference = Math.abs(1 - (Differential.right_position + delta));
+            return (delta + difference);
+        }
+        return delta;
+    }
+
     public void autonomousPathUpdate() {
         switch (pathState) {
             /* Cases 0 to 5 are for depositing the initial sample before entering the search loop */
@@ -250,7 +280,7 @@ public class OpenSauceAuto extends OpMode {
                     if (sampleDetected) {
                         setPathState(10);
                     } else if (follower.getPose().getX() >= searchEndPose.getX() - 0.5) {
-                        setPathState(99); // Search complete
+                        setPathState(99);
                     } else {
                         setPathState(8);
                     }
@@ -264,12 +294,14 @@ public class OpenSauceAuto extends OpMode {
                 }
                 break;
             case 11:
-                intakeOuttake.setAutoSearchTarget(1000, -300 - EXTENSION_SOFT_OFFSET);
-                double[] diffyStart = calcDiffyOrientLevel();
-                intakeOuttake.setAutoOrientTarget(diffyStart[0], diffyStart[1]);
-                intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
-                intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
-                setPathState(12);
+                if (pathTimer.getElapsedTimeSeconds() > INITIAL_WAIT) {
+                    intakeOuttake.setAutoSearchTarget(1000, -200 - EXTENSION_SOFT_OFFSET);
+                    double[] diffyStart = calcDiffyOrientLevel();
+                    intakeOuttake.setAutoOrientTarget(diffyStart[0], diffyStart[1]);
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(12);
+                }
                 break;
             case 12:
                 if (pathTimer.getElapsedTimeSeconds() > STEP_INTERVAL) {
@@ -277,46 +309,187 @@ public class OpenSauceAuto extends OpMode {
                     double currentExtension = intakeOuttake.arm.extensionLeft.getCurrentPosition();
 
                     if (currentExtension < -1100) {
-                        setPathState(13);
+                        setPathState(99);
                         break;
                     }
-                    else {
-                        double[] nextStep = calcNextStep(currentPitch, currentExtension, DIST_INCREMENT);
-                        double[] nextDiffy = calcDiffyOrientLevel();
 
-                        intakeOuttake.setAutoSearchTarget(nextStep[0], nextStep[1] - EXTENSION_SOFT_OFFSET);
-                        intakeOuttake.setAutoOrientTarget(nextDiffy[0], nextDiffy[1]);
-                        intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
-                        intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
-                        setPathState(12);
-                        pathTimer.resetTimer();
-                        break;
+                    if (webcam2Ready) {
+                        Mat currentFrame2 = webcam2Pipeline.getLatestFrame();
+
+                        angleData = Camera.AngleAndDistancePipeline.getClosestYellowContourAngle(currentFrame2);
+                        if (angleData != null) {
+                            telemetry.addData("Angle of Closest Yellow (Cam 2):", String.valueOf(angleData[2]));
+                            if (angleData[3] == 0) {
+                                setPathState(13);
+                                break;
+                            }
+                        } else {
+                            telemetry.addData("Closest Yellow (Cam 2):", "None detected");
+                        }
+                    } else {
+                        telemetry.addData("Webcam 2", "Not ready yet");
                     }
+
+                    totalDistance += DIST_INCREMENT;
+                    double[] nextStep = calcNextStep(currentPitch, currentExtension, DIST_INCREMENT);
+                    double[] nextDiffy = calcDiffyOrientLevel();
+
+                    intakeOuttake.setAutoSearchTarget(nextStep[0], nextStep[1] - EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setAutoOrientTarget(nextDiffy[0], nextDiffy[1]);
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
                 }
                 break;
             case 13:
-                setPathState(99);
+                List<Integer> angles = new ArrayList<>();
+                int validFrames = 0;
+
+                while (validFrames < 10 && webcam2Ready) {
+                    Mat currentFrame = webcam2Pipeline.getLatestFrame();
+                    int[] data = Camera.AngleAndDistancePipeline.getClosestYellowContourAngle(currentFrame);
+                    if (data != null) {
+                        angles.add(data[2]);
+                        validFrames++;
+                    }
+                }
+
+                List<Integer> filtered = new ArrayList<>();
+                for (int angle : angles) {
+                    if (angle != 0 && angle != 180 && angle != -180) {
+                        filtered.add(angle);
+                    }
+                }
+
+                double finalAngle = 0;
+                if (!filtered.isEmpty()) {
+                    double sum = 0;
+                    for (int a : filtered) {
+                        sum += a;
+                    }
+                    finalAngle = sum / filtered.size();
+                }
+
+                angleOfBlock = finalAngle;
+
+                telemetry.addData("Average Angle (filtered):", finalAngle);
+                telemetry.addData("xCenter of Block Found:", angleData[0]);  // Optional if using first angleData
+                telemetry.addData("yCenter of Block Found:", angleData[1]);
+
+                if (intakeOuttake.claw.position != 0) {
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLAW);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.OPEN_CLAW);
+                }
+
+                if (pathTimer.getElapsedTimeSeconds() > 6) {
+                    setPathState(14);
+                }
                 break;
+
             case 14:
-                follower.followPath(new Path(new BezierLine(
-                        new Point(follower.getPose()),
-                        new Point(searchToDeposit)
-                )), true);
-                setPathState(15);
+                if (pathTimer.getElapsedTimeSeconds() > 0.3) {
+                    if (angleOfBlock != 0) {
+                        intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(),intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                    } else {
+                        intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(),intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET - 50);
+                    }
+
+                    intakeOuttake.setAutoOrientTarget(LEFT_DOWN, RIGHT_DOWN);
+
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(15);
+                }
                 break;
 
             case 15:
-                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), searchToDeposit) < 0.5) {
-                    follower.followPath(searchToScore, true);
+                if (pathTimer.getElapsedTimeSeconds() > 1 && ((intakeOuttake.targetExtension - intakeOuttake.arm.extensionLeft.getCurrentPosition()) > -175)) {
+                    intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(), intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                    double diffyDelta = calcDiffyOrientToSample(angleOfBlock);
+                    intakeOuttake.setAutoOrientTarget(Differential.left_position + diffyDelta, Differential.right_position + diffyDelta);
+
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
                     setPathState(16);
                 }
                 break;
 
             case 16:
+                if (pathTimer.getElapsedTimeSeconds() > 1) {
+                    intakeOuttake.setAutoSearchTarget(600, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(17);
+                }
+                break;
+
+            case 17:
+                if (pathTimer.getElapsedTimeSeconds() > 1) {
+                    intakeOuttake.setAutoSearchTarget(0, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(18);
+                }
+                break;
+
+            case 18:
+                if (pathTimer.getElapsedTimeSeconds() > 0.75) {
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLAW);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.CLOSE_CLAW);
+                    setPathState(19);
+                }
+                break;
+
+            case 19:
+                if (pathTimer.getElapsedTimeSeconds() > 0.75) {
+                    intakeOuttake.setAutoSearchTarget(500, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setAutoOrientTarget(0.84, 0.16);
+
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(20);
+                }
+                break;
+
+            case 20:
+                if (pathTimer.getElapsedTimeSeconds() > 0.75) {
+                    intakeOuttake.setAutoSearchTarget(500, -EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(21);
+                }
+                break;
+
+            case 21:
+                if (pathTimer.getElapsedTimeSeconds() > 1) {
+                    intakeOuttake.setAutoSearchTarget(0, -EXTENSION_SOFT_OFFSET);
+                    intakeOuttake.setAutoOrientTarget(1, 0);
+
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    setPathState(22);
+                }
+                break;
+
+            case 22:
+                follower.followPath(new Path(new BezierLine(
+                        new Point(follower.getPose()),
+                        new Point(searchToDeposit)
+                )), true);
+                setPathState(23);
+                break;
+
+            case 23:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), depositPose) < 0.5) {
-                    setPathState(1);
+                        distanceBetweenPoses(follower.getPose(), searchToDeposit) < 0.5) {
+                    follower.followPath(searchToScore, true);
+                    setPathState(24);
+                }
+                break;
+
+            case 24:
+                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                        distanceBetweenPoses(follower.getPose(), depositPose) < 1.0) {
+                    setPathState(2);
                 }
                 break;
             case 99:
@@ -363,14 +536,19 @@ public class OpenSauceAuto extends OpMode {
                 telemetry.addData("Cam2 Yellow", "None detected");
             }
         }
-
         // Feedback to Driver Hub
-        telemetry.addData("path state", pathState);
+        telemetry.addData("Path State:", pathState);
         telemetry.addData("x", follower.getPose().getX());
         telemetry.addData("y", follower.getPose().getY());
-        telemetry.addData("heading", follower.getPose().getHeading());
-        telemetry.addData("pitch", intakeOuttake.arm.pitch.getCurrentPosition());
-        telemetry.addData("arm", intakeOuttake.arm.extensionLeft.getCurrentPosition());
+        telemetry.addData("Heading:", follower.getPose().getHeading());
+        telemetry.addData("Pitch Target:", intakeOuttake.targetPitch);
+        telemetry.addData("Pitch Current:", intakeOuttake.arm.pitch.getCurrentPosition());
+        telemetry.addData("Extension Target", intakeOuttake.targetExtension);
+        telemetry.addData("Extension Current", intakeOuttake.arm.extensionLeft.getCurrentPosition());
+        telemetry.addData("Extension Accuracy difference", (intakeOuttake.targetExtension - intakeOuttake.arm.extensionLeft.getCurrentPosition()));
+        telemetry.addData("Total Distance Moved", totalDistance);
+        telemetry.addData("Diffy Left Target", Differential.left_position);
+        telemetry.addData("Diffy Right Target", Differential.right_position);
         telemetry.update();
 
         Drawing.drawPoseHistory(dashboardPoseTracker, "#4CAF50");
@@ -396,6 +574,7 @@ public class OpenSauceAuto extends OpMode {
             @Override
             public void onOpened() {
                 webcam1.startStreaming(320, 240, OpenCvCameraRotation.UPRIGHT);
+                webcam1Ready = true;
             }
 
             @Override
@@ -414,6 +593,7 @@ public class OpenSauceAuto extends OpMode {
             @Override
             public void onOpened() {
                 webcam2.startStreaming(320, 240, OpenCvCameraRotation.UPRIGHT);
+                webcam2Ready = true;
             }
 
             @Override
