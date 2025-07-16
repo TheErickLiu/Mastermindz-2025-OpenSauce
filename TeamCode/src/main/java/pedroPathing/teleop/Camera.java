@@ -170,41 +170,100 @@ public class Camera extends OpMode {
             Core.inRange(hsv, lowerYellow, upperYellow, mask);
 
             // Find contours
-            List<MatOfPoint> contours = new java.util.ArrayList<>();
+            List<MatOfPoint> contours = new ArrayList<>();
             Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
             if (contours.isEmpty()) return null;
 
-            int imgCenterX = input.cols() / 2;
-            int imgCenterY = input.rows() / 2;
+            // Define the "priority" region:
+            int leftBound = input.cols() * 1 / 6;
+            int rightBound = input.cols() * 5 / 6;
+            int topBound = input.rows() * 1 / 3;
+            int bottomBound = input.rows();
 
-            MatOfPoint closestContour = null;
-            double minDist = Double.MAX_VALUE;
+            // For contours inside the area with 90% points inside:
+            MatOfPoint bestInAreaContour = null;
+            double bestAngleDiff = Double.MAX_VALUE;
+
+            // For fallback: contours outside area, find closest to center bottom
+            MatOfPoint bestFallbackContour = null;
+            double minDistToBottomCenter = Double.MAX_VALUE;
+
+            int centerX = input.cols() / 2;
+            int bottomY = input.rows();
 
             for (MatOfPoint contour : contours) {
-                Moments M = Imgproc.moments(contour);
-                if (M.get_m00() > 0) {
-                    int cX = (int) (M.get_m10() / M.get_m00());
-                    int cY = (int) (M.get_m01() / M.get_m00());
-                    double dist = Math.hypot(cX - imgCenterX, cY - imgCenterY);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        closestContour = contour;
+                Point[] points = contour.toArray();
+
+                // Count how many points inside the priority area
+                int insideCount = 0;
+                for (Point p : points) {
+                    if (p.x >= leftBound && p.x <= rightBound && p.y >= topBound && p.y <= bottomBound) {
+                        insideCount++;
+                    }
+                }
+
+                double percentInside = (double) insideCount / points.length;
+
+                if (percentInside >= 0.9) {
+                    // Contour meets area criteria, check angle closeness to zero
+                    RotatedRect rect = Imgproc.minAreaRect(new MatOfPoint2f(points));
+                    double angle = rect.angle;
+                    if (rect.size.width > rect.size.height) {
+                        angle -= 90;
+                    }
+                    double angleDiff = Math.abs(angle);
+                    if (angleDiff < bestAngleDiff) {
+                        bestAngleDiff = angleDiff;
+                        bestInAreaContour = contour;
+                    }
+                } else {
+                    // Contour outside area, consider for fallback by distance to bottom center
+                    Moments M = Imgproc.moments(contour);
+                    if (M.get_m00() > 0) {
+                        int cX = (int) (M.get_m10() / M.get_m00());
+                        int cY = (int) (M.get_m01() / M.get_m00());
+                        double dist = Math.hypot(cX - centerX, cY - bottomY);
+                        if (dist < minDistToBottomCenter) {
+                            minDistToBottomCenter = dist;
+                            bestFallbackContour = contour;
+                        }
                     }
                 }
             }
 
-            if (closestContour == null) return null;
-
-            RotatedRect box = Imgproc.minAreaRect(new MatOfPoint2f(closestContour.toArray()));
-            int angle = (int) box.angle;
-            if (box.size.width > box.size.height) {
-                angle -= 90;
+            if (bestInAreaContour != null) {
+                RotatedRect box = Imgproc.minAreaRect(new MatOfPoint2f(bestInAreaContour.toArray()));
+                int angle = (int) box.angle;
+                if (box.size.width > box.size.height) {
+                    angle -= 90;
+                }
+                return new int[] {
+                        (int) box.center.x,
+                        (int) box.center.y,
+                        angle,
+                        0  // Indicates contour is inside priority area
+                };
             }
 
-            // Return as int array: [centerX, centerY, angle]
-            return new int[] { (int) box.center.x, (int) box.center.y, angle};
+            if (bestFallbackContour != null) {
+                RotatedRect box = Imgproc.minAreaRect(new MatOfPoint2f(bestFallbackContour.toArray()));
+                int angle = (int) box.angle;
+                if (box.size.width > box.size.height) {
+                    angle -= 90;
+                }
+                return new int[] {
+                        (int) box.center.x,
+                        (int) box.center.y,
+                        angle,
+                        1  // Indicates no contour inside priority area; fallback
+                };
+            }
+
+            // No contours found at all (should be unreachable due to earlier check)
+            return null;
         }
+
         public Mat getLatestFrame() {
             return latestFrame;
         }

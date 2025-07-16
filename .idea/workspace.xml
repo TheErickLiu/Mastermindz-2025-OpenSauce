@@ -9,22 +9,20 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d429def9-bcce-4a9a-b3c4-60a79230f511" name="Changes" comment="i dont even know what commit this is by now">
-      <change afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabManualTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabTest.java" afterDir="false" />
+    <list default="true" id="d429def9-bcce-4a9a-b3c4-60a79230f511" name="Changes" comment="the thing searchs forward n keeps camera pointed at floor">
+      <change afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoDiffyTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/8.9/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/executionHistory/executionHistory.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.9/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/DriverHubConfig.txt" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/DriverHubConfig.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceAuto.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceAuto.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/examples/OpenSauceTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/Camera.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/Camera.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/CameraTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/CameraTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/IntakeOuttake.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/teleop/IntakeOuttake.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabManualTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabManualTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/AutoGrabTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/DiffyTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/TeamCode/src/main/java/pedroPathing/testing/DiffyTest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -35,7 +33,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=/Users/erickliu/.android/avd/Medium_Phone.avd)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=Default, isTemplate=false, identifier=serial=192.168.43.1:5555;connection=662ae447)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -222,7 +220,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752298016236</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="the thing searchs forward n keeps camera pointed at floor">
+      <option name="closed" value="true" />
+      <created>1752470597976</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1752470597977</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -242,6 +248,7 @@
     <MESSAGE value="I'll add you too why not" />
     <MESSAGE value="added states, sample check for camera" />
     <MESSAGE value="i dont even know what commit this is by now" />
-    <option name="LAST_COMMIT_MESSAGE" value="i dont even know what commit this is by now" />
+    <MESSAGE value="the thing searchs forward n keeps camera pointed at floor" />
+    <option name="LAST_COMMIT_MESSAGE" value="the thing searchs forward n keeps camera pointed at floor" />
   </component>
 </project>

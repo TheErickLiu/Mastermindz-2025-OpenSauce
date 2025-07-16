@@ -14,8 +14,8 @@ public class IntakeOuttake {
     private long previous_action = System.currentTimeMillis();
     public double targetPitch = 0;
     public double targetExtension = 0;
-    public double left = 0.98;
-    public double right = 0.06;
+    public double left = 1;
+    public double right = 0;
 
     private double waitTime = 1000;
     public static boolean closed_zero_out = true;
@@ -493,6 +493,19 @@ public class IntakeOuttake {
                         break;
                 }
                 break;
+
+            case CLAW:
+                switch (specificInstruction) {
+                    case CLOSE_CLAW:
+                        claw.full();
+                        claw.close();
+                        break;
+
+                    case OPEN_CLAW:
+                        claw.open();
+                        break;
+                }
+                break;
             
             case CHANGE_DIFFY:
                 switch (specificInstruction) {
@@ -573,6 +586,7 @@ public class IntakeOuttake {
         INTAKE,
         OPEN_CLAW,
         CLOSE_CLAW,
+        CLAW,
         SPECIMAN_DEPOSIT,
         SPECIMAN_DEPOSIT_DOWN, HOLD, CHANGE_DIFFY, SPECIMAN_INTAKE, PITCH_DOWN_CLOSE, HORIZ_DIFFY, EXTEND_TO, EXTEND_TO_ONE, EXTEND_TO_TWO, EXTEND_TO_THREE, AUTO_CLOSE_CLAW, FRONT_SPECIMAN_DEPOSIT, EXTEND_TO_ONE_SPEC, SPEC_OPEN_CLAW, EXTEND_TO_TWO_SPEC, EXTEND_TO_DROP, PRE_EXTEND_TWO, DOWN_HOLD, AUTO_SPECIMAN_DEPOSIT, AUTO_INTAKE, OPEN_PUSHER, CLOSE_PUSHER, SUPER_PUSHER, AUTO_HOLD, SPECIMAN_INTAKE_ONE, AUTO_SPECIMAN_DEPOSIT_TWO, WALL_SPECIMAN_INTAKE, HALF_OPEN_CLAW;
     }

@@ -12,7 +12,7 @@ public class DiffyTest extends OpMode {
     private Gamepad previousGamepad1 = new Gamepad();
     private Gamepad currentGamepad1 = new Gamepad();
 
-    private static final double STEP = 0.1;
+    private static final double STEP = 0.02;
 
     @Override
     public void init() {

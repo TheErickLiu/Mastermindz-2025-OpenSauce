@@ -63,6 +63,9 @@ public class OpenSauceAuto extends OpMode {
     private OpenCvCamera webcam2;
 
     private double STEP_SIZE = 0.5;
+    public static final int EXTENSION_SOFT_OFFSET = 150;
+    private static final double DIST_INCREMENT = 2.0;
+    private static final double STEP_INTERVAL = 3.0;
 
     /** This is the variable where we store the state of our auto.
      * It is used by the pathUpdate method. */
@@ -79,8 +82,8 @@ public class OpenSauceAuto extends OpMode {
 
     private final Pose startPose = new Pose(-1, 0, Math.toRadians(0));
     private final Pose scorePose = new Pose(2, 17, Math.toRadians(-45));
-    private final Pose searchStartPose = new Pose (-1, 3, Math.toRadians(-90));
-    private final Pose searchEndPose = new Pose (16.5, 3, Math.toRadians(-90));
+    private final Pose searchStartPose = new Pose (-1, 1, Math.toRadians(-90));
+    private final Pose searchEndPose = new Pose (16.5, 1, Math.toRadians(-90));
     private final Pose searchToDeposit = new Pose (8, 10, Math.toRadians(-45));
     private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
 
@@ -132,6 +135,36 @@ public class OpenSauceAuto extends OpMode {
         double dx = a.getX() - b.getX();
         double dy = a.getY() - b.getY();
         return Math.hypot(dx, dy);
+    }
+
+    public double[] calcNextStep(double pitch, double extension, double dist) {
+        double angle = 0.00457866 * Math.pow(pitch - 300, 1.34041);
+        double extendDist = 0.0342105 * (-extension) + 48.62829;
+        double x = extendDist * Math.cos(Math.toRadians(angle));
+        double y = extendDist * Math.sin(Math.toRadians(angle));
+        double newExtendDist = Math.sqrt(Math.pow(y, 2) + Math.pow(x + dist, 2));
+        double newAngle = Math.toDegrees(Math.atan2(y, x + dist));
+        double newPitch = 57.26156 * Math.pow(newAngle, 0.738704) + 300;
+        double newExtension = -(29.1981 * newExtendDist - 1419.40691);
+        return new double[]{ newPitch, newExtension };
+    }
+
+    public double[] calcDiffyOrientLevel() {
+
+        double leftcurrentpos = Differential.left.getPosition();
+        double rightcurrentpos = Differential.right.getPosition();
+
+        if (leftcurrentpos == 1 && rightcurrentpos == 0) {
+            return new double[]{ 1, 0 };
+        }
+
+        double left = leftcurrentpos - 0.002 * DIST_INCREMENT;
+        double right = rightcurrentpos + 0.002 * DIST_INCREMENT;
+
+        // Clamp to [0, 1]
+        left = Math.max(0.0, Math.min(1.0, left));
+        right = Math.max(0.0, Math.min(1.0, right));
+        return new double[]{ left, right };
     }
     public void autonomousPathUpdate() {
         switch (pathState) {
@@ -224,36 +257,44 @@ public class OpenSauceAuto extends OpMode {
                 }
                 break;
             case 10:
-                // move diffy to directly down
-                // move pitch to 30 degrees
-                // extend arm to x amount
-                // calculate and move diffy so its still directly pointed down
-                // calculate height of camera above ground
-                setPathState(11);
+                intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLOSED);
+                intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
+                if (pathTimer.getElapsedTimeSeconds() > 0.5) {
+                    setPathState(11);
+                }
                 break;
             case 11:
-                // check if sample contour center is in center of camera
-                // If true, set state 12
-                // If false,
-                // extend arm by x amount
-                // Lower pitch by (original pitch - sin^-1(height/arm length))
-                // repeat state 11
+                intakeOuttake.setAutoSearchTarget(1000, -300 - EXTENSION_SOFT_OFFSET);
+                double[] diffyStart = calcDiffyOrientLevel();
+                intakeOuttake.setAutoOrientTarget(diffyStart[0], diffyStart[1]);
+                intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
                 setPathState(12);
                 break;
             case 12:
-                // claw fully opened
-                // calculate distance from base of arm
-                // calculate distance need to extend
-                // run get angle on sample
-                // calculate diffy offset
-                setPathState(13);
+                if (pathTimer.getElapsedTimeSeconds() > STEP_INTERVAL) {
+                    double currentPitch = intakeOuttake.arm.pitch.getCurrentPosition();
+                    double currentExtension = intakeOuttake.arm.extensionLeft.getCurrentPosition();
+
+                    if (currentExtension < -1100) {
+                        setPathState(13);
+                        break;
+                    }
+                    else {
+                        double[] nextStep = calcNextStep(currentPitch, currentExtension, DIST_INCREMENT);
+                        double[] nextDiffy = calcDiffyOrientLevel();
+
+                        intakeOuttake.setAutoSearchTarget(nextStep[0], nextStep[1] - EXTENSION_SOFT_OFFSET);
+                        intakeOuttake.setAutoOrientTarget(nextDiffy[0], nextDiffy[1]);
+                        intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                        intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                        setPathState(12);
+                        pathTimer.resetTimer();
+                        break;
+                    }
+                }
                 break;
             case 13:
-                // pitch to 0
-                // rotate diffy to calculated offset
-                // extend to 0
-                // extend to calculated distance
-                // close claw
                 setPathState(99);
                 break;
             case 14:

@@ -25,7 +25,7 @@ public class AutoGrabTest extends OpMode {
 
     public static final int EXTENSION_SOFT_OFFSET = 150;
     private static final double INITIAL_WAIT = 5.0;
-    private static final double STEP_INTERVAL = 3.0;
+    private static final double STEP_INTERVAL = 1.5;
     private static final double DIST_INCREMENT = 2.0;
 
     private double totalDistance = 0;
