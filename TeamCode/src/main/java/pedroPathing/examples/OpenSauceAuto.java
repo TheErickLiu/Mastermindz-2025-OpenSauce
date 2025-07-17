@@ -15,6 +15,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import  com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.PwmControl;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.opencv.core.Mat;
@@ -53,7 +54,8 @@ public class OpenSauceAuto extends OpMode {
     private DashboardPoseTracker dashboardPoseTracker;
     private IntakeOuttake intakeOuttake;
     private Follower follower;
-    private Timer pathTimer, actionTimer, opmodeTimer;
+    private Timer pathTimer, opmodeTimer;
+    private ElapsedTime elapsedTimer = new ElapsedTime();
     private TelescopingArm arm;
     private Differential diffy;
     private Claw claw;
@@ -68,14 +70,16 @@ public class OpenSauceAuto extends OpMode {
     boolean webcam2Ready = false;
     int[] angleData;
     private double totalDistance = 0;
-
-    private double STEP_SIZE = 0.5;
+    private int numberOfTimesDeposited = -1;
+    private static double grab_offset;
+    private double STEP_SIZE = 0.6;
     public static final int EXTENSION_SOFT_OFFSET = 150;
     private static final double DIST_INCREMENT = 2.0;
     private static final double STEP_INTERVAL = 1.5;
     private static final double INITIAL_WAIT = 2.0;
     private static final double LEFT_DOWN = 0.84;
     private static final double RIGHT_DOWN = 0.16;
+    private static final double DEPOSIT_OFFSET = 0.25;
     public double angleOfBlock;
 
     /** This is the variable where we store the state of our auto.
@@ -93,8 +97,8 @@ public class OpenSauceAuto extends OpMode {
 
     private final Pose startPose = new Pose(-1, 0, Math.toRadians(0));
     private final Pose scorePose = new Pose(2, 17, Math.toRadians(-45));
-    private final Pose searchStartPose = new Pose (-1, 1, Math.toRadians(-90));
-    private final Pose searchEndPose = new Pose (16.5, 1, Math.toRadians(-90));
+    private final Pose searchStartPose = new Pose (-1, 4, Math.toRadians(-90));
+    private final Pose searchEndPose = new Pose (16.5, 4, Math.toRadians(-90));
     private final Pose searchToDeposit = new Pose (8, 10, Math.toRadians(-45));
     private final Pose depositPose = new Pose(2, 17, Math.toRadians(-45));
 
@@ -175,25 +179,41 @@ public class OpenSauceAuto extends OpMode {
         right = Math.max(0.0, Math.min(1.0, right));
         return new double[]{ left, right };
     }
-    public double calcDiffyOrientToSample(double angle) {
+    public double[] calcDiffyOrientToSample(double angle) {
         if (angle < -90) {
             angle += 180;
         } else if (angle > 90) {
             angle -= 180;
         }
 
-        double difference = 0;
         double delta = angle * (0.14 / 90.0);
+        double difference = 0;
 
         if ((Differential.left_position + delta) > 1) {
             difference = Math.abs(1 - (Differential.left_position + delta));
-            return (delta - difference);
-        }
-        else if ((Differential.right_position + delta) < 0) {
+            delta -= difference;
+        } else if ((Differential.right_position + delta) < 0) {
             difference = Math.abs(1 - (Differential.right_position + delta));
-            return (delta + difference);
+            delta += difference;
         }
-        return delta;
+
+        double offset = angle > 0 ? -30 : 30;
+
+        return new double[] { delta, offset };
+    }
+    private Pose getDynamicDepositPose() {
+        return new Pose(
+                depositPose.getX() + DEPOSIT_OFFSET * numberOfTimesDeposited,
+                depositPose.getY(),
+                depositPose.getHeading()
+        );
+    }
+    private Pose getDynamicSearchStartPose() {
+        return new Pose(
+                searchStartPose.getX() + 0.25 * numberOfTimesDeposited,
+                searchStartPose.getY(),
+                searchStartPose.getHeading()
+        );
     }
 
     public void autonomousPathUpdate() {
@@ -206,18 +226,23 @@ public class OpenSauceAuto extends OpMode {
                 intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
                 intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
                 follower.followPath(scorePreload, true);
+                elapsedTimer.reset();
                 setPathState(1);
                 break;
             case 1:
                 /* This case checks the robot's position and will wait until the robot position is close (1 inch away) from the scorePose's position */
                 if(pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), scorePose) < 2.0) {
-                    follower.followPath(deposit, true);
+                    numberOfTimesDeposited++;
+                    Pose dynamicDeposit = getDynamicDepositPose();
+                    Path depositDynamic = new Path(new BezierLine(new Point(scorePose), new Point(dynamicDeposit)));
+                    depositDynamic.setLinearHeadingInterpolation(scorePose.getHeading(), dynamicDeposit.getHeading());
+                    follower.followPath(depositDynamic, true);
                     setPathState(2);
                 }
                 break;
             case 2:
-                if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
+                if (pathTimer.getElapsedTimeSeconds() > 6 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
                     diffy.resetOffsets();
                     arm.resetOffsets();
@@ -250,13 +275,17 @@ public class OpenSauceAuto extends OpMode {
             case 6:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 2.0) {
-                    follower.followPath(scoreToSearch, true);
+                    Pose dynamicSearchStart = getDynamicSearchStartPose();
+                    Path scoreToSearchDynamic = new Path(new BezierLine(new Point(depositPose), new Point(dynamicSearchStart)));
+                    scoreToSearchDynamic.setLinearHeadingInterpolation(depositPose.getHeading(), dynamicSearchStart.getHeading());
+                    follower.followPath(scoreToSearchDynamic, true);
                     setPathState(7);
                 }
                 break;
             case 7:
+                Pose dynamicSearchStart = getDynamicSearchStartPose();
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), searchStartPose) < 1.0) {
+                        distanceBetweenPoses(follower.getPose(), dynamicSearchStart) < 1.0) {
                     setPathState(8);
                 }
                 break;
@@ -289,7 +318,10 @@ public class OpenSauceAuto extends OpMode {
             case 10:
                 intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLOSED);
                 intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
-                if (pathTimer.getElapsedTimeSeconds() > 0.5) {
+                intakeOuttake.arm.override_pitch = true;
+                intakeOuttake.closed_zero_out = false;
+                intakeOuttake.arm.resetOffsets();
+                if (pathTimer.getElapsedTimeSeconds() > 1.5) {
                     setPathState(11);
                 }
                 break;
@@ -301,10 +333,11 @@ public class OpenSauceAuto extends OpMode {
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
                     intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
                     setPathState(12);
+                    elapsedTimer.reset();
                 }
                 break;
             case 12:
-                if (pathTimer.getElapsedTimeSeconds() > STEP_INTERVAL) {
+                if (elapsedTimer.seconds() > STEP_INTERVAL) {
                     double currentPitch = intakeOuttake.arm.pitch.getCurrentPosition();
                     double currentExtension = intakeOuttake.arm.extensionLeft.getCurrentPosition();
 
@@ -338,9 +371,11 @@ public class OpenSauceAuto extends OpMode {
                     intakeOuttake.setAutoOrientTarget(nextDiffy[0], nextDiffy[1]);
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
                     intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MOVE_TO_AUTO_SEARCH_POS);
+                    elapsedTimer.reset();
                 }
                 break;
             case 13:
+                intakeOuttake.arm.override_pitch = true;
                 List<Integer> angles = new ArrayList<>();
                 int validFrames = 0;
 
@@ -387,8 +422,9 @@ public class OpenSauceAuto extends OpMode {
 
             case 14:
                 if (pathTimer.getElapsedTimeSeconds() > 0.3) {
+                    intakeOuttake.arm.override_pitch = true;
                     if (angleOfBlock != 0) {
-                        intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(),intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
+                        intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(),intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET + grab_offset);
                     } else {
                         intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(),intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET - 50);
                     }
@@ -403,8 +439,10 @@ public class OpenSauceAuto extends OpMode {
 
             case 15:
                 if (pathTimer.getElapsedTimeSeconds() > 1 && ((intakeOuttake.targetExtension - intakeOuttake.arm.extensionLeft.getCurrentPosition()) > -175)) {
+                    intakeOuttake.arm.override_pitch = true;
                     intakeOuttake.setAutoSearchTarget(intakeOuttake.arm.pitch.getCurrentPosition(), intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
-                    double diffyDelta = calcDiffyOrientToSample(angleOfBlock);
+                    double diffyDelta = calcDiffyOrientToSample(angleOfBlock)[0];
+                    grab_offset = calcDiffyOrientToSample(angleOfBlock)[1];
                     intakeOuttake.setAutoOrientTarget(Differential.left_position + diffyDelta, Differential.right_position + diffyDelta);
 
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
@@ -414,6 +452,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 16:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 1) {
                     intakeOuttake.setAutoSearchTarget(600, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
@@ -423,6 +462,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 17:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 1) {
                     intakeOuttake.setAutoSearchTarget(0, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
@@ -432,6 +472,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 18:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 0.75) {
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.CLAW);
                     intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.CLOSE_CLAW);
@@ -440,6 +481,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 19:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 0.75) {
                     intakeOuttake.setAutoSearchTarget(500, intakeOuttake.arm.extensionLeft.getCurrentPosition() - EXTENSION_SOFT_OFFSET);
                     intakeOuttake.setAutoOrientTarget(0.84, 0.16);
@@ -451,6 +493,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 20:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 0.75) {
                     intakeOuttake.setAutoSearchTarget(500, -EXTENSION_SOFT_OFFSET);
                     intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
@@ -460,6 +503,7 @@ public class OpenSauceAuto extends OpMode {
                 break;
 
             case 21:
+                intakeOuttake.arm.override_pitch = true;
                 if (pathTimer.getElapsedTimeSeconds() > 1) {
                     intakeOuttake.setAutoSearchTarget(0, -EXTENSION_SOFT_OFFSET);
                     intakeOuttake.setAutoOrientTarget(1, 0);
@@ -480,8 +524,12 @@ public class OpenSauceAuto extends OpMode {
 
             case 23:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
-                        distanceBetweenPoses(follower.getPose(), searchToDeposit) < 0.5) {
-                    follower.followPath(searchToScore, true);
+                        distanceBetweenPoses(follower.getPose(), searchToDeposit) < 2) {
+                    numberOfTimesDeposited++;
+                    Pose dynamicDeposit = getDynamicDepositPose();
+                    Path searchToScoreDynamic = new Path(new BezierLine(new Point(searchToDeposit), new Point(dynamicDeposit)));
+                    searchToScoreDynamic.setLinearHeadingInterpolation(searchToDeposit.getHeading(), dynamicDeposit.getHeading());
+                    follower.followPath(searchToScoreDynamic, true);
                     setPathState(24);
                 }
                 break;
@@ -489,6 +537,8 @@ public class OpenSauceAuto extends OpMode {
             case 24:
                 if (pathTimer.getElapsedTimeSeconds() > 0.5 &&
                         distanceBetweenPoses(follower.getPose(), depositPose) < 1.0) {
+                    intakeOuttake.setInstructions(IntakeOuttake.Instructions.HOLD);
+                    intakeOuttake.setSpecificInstruction(IntakeOuttake.SpecificInstructions.MAX_RETRACT);
                     setPathState(2);
                 }
                 break;
@@ -511,6 +561,7 @@ public class OpenSauceAuto extends OpMode {
 
         // These loop the movements of the robot
         follower.update();
+        intakeOuttake.arm.override_pitch = true;
         intakeOuttake.update();
         autonomousPathUpdate();
 
@@ -538,12 +589,13 @@ public class OpenSauceAuto extends OpMode {
         }
         // Feedback to Driver Hub
         telemetry.addData("Path State:", pathState);
+        telemetry.addData("Override Pitch:", intakeOuttake.arm.override_pitch);
         telemetry.addData("x", follower.getPose().getX());
         telemetry.addData("y", follower.getPose().getY());
         telemetry.addData("Heading:", follower.getPose().getHeading());
-        telemetry.addData("Pitch Target:", intakeOuttake.targetPitch);
+        telemetry.addData("Pitch Target:", intakeOuttake.arm.pitchTargetPosition);
         telemetry.addData("Pitch Current:", intakeOuttake.arm.pitch.getCurrentPosition());
-        telemetry.addData("Extension Target", intakeOuttake.targetExtension);
+        telemetry.addData("Extension Target", intakeOuttake.arm.extensionTargetPosition);
         telemetry.addData("Extension Current", intakeOuttake.arm.extensionLeft.getCurrentPosition());
         telemetry.addData("Extension Accuracy difference", (intakeOuttake.targetExtension - intakeOuttake.arm.extensionLeft.getCurrentPosition()));
         telemetry.addData("Total Distance Moved", totalDistance);

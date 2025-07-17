@@ -120,6 +120,54 @@ public class Camera extends OpMode {
             int centerX = input.cols() / 2;
             final double MIN_SCALE_AREA = 120000;
             final double MAX_SCALE_AREA = 750000;
+            final int MIN_TOLERANCE = 50;
+            final int MAX_TOLERANCE = 400;
+
+            // Find largest area among valid contours
+            double maxContourArea = 0;
+            for (MatOfPoint contour : validContours) {
+                double area = Imgproc.contourArea(contour);
+                if (area > maxContourArea) {
+                    maxContourArea = area;
+                }
+            }
+
+            if (maxContourArea == 0) return false;
+
+            // Scale and clamp tolerance
+            double clampedArea = Math.max(MIN_SCALE_AREA, Math.min(MAX_SCALE_AREA, maxContourArea));
+            int tolerance = (int) (MIN_TOLERANCE +
+                    (clampedArea - MIN_SCALE_AREA) * (MAX_TOLERANCE - MIN_TOLERANCE) / (MAX_SCALE_AREA - MIN_SCALE_AREA));
+
+            int bandLeft = centerX - tolerance;
+            int bandRight = centerX + tolerance;
+            int bandWidth = bandRight - bandLeft;
+
+            // Check bounding box overlap
+            for (MatOfPoint contour : validContours) {
+                Rect boundingBox = Imgproc.boundingRect(contour);
+                int left = boundingBox.x;
+                int right = boundingBox.x + boundingBox.width;
+
+                int overlapLeft = Math.max(left, bandLeft);
+                int overlapRight = Math.min(right, bandRight);
+                int overlapWidth = Math.max(0, overlapRight - overlapLeft);
+
+                if (overlapWidth >= 0.6 * bandWidth) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public boolean detectSampleInFrontTest(Mat input) {
+
+            List<MatOfPoint> validContours = getValidContours(input);
+
+            int centerX = input.cols() / 2;
+            final double MIN_SCALE_AREA = 120000;
+            final double MAX_SCALE_AREA = 750000;
             final int MIN_TOLERANCE = 80;
             final int MAX_TOLERANCE = 500;
 

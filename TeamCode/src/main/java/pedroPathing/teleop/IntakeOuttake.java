@@ -12,8 +12,8 @@ public class IntakeOuttake {
     public SpecificInstructions previousSpecificInstruction;
     OpenCvCamera webcam;
     private long previous_action = System.currentTimeMillis();
-    public double targetPitch = 0;
-    public double targetExtension = 0;
+    public double targetPitch = 1000;
+    public double targetExtension = -350;
     public double left = 1;
     public double right = 0;
 
